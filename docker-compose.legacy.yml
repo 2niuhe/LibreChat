@@ -8,6 +8,7 @@ services:
     image: ghcr.io/danny-avila/librechat-dev:latest
     restart: always
     user: "${UID}:${GID}"
+    privileged: true
     environment:
       - NODE_ENV=development
       - HOST=0.0.0.0
@@ -35,6 +36,7 @@ services:
     image: mongo
     restart: always
     user: "${UID}:${GID}"
+    privileged: true
     volumes:
       - ./data-node:/data/db
     command: mongod --noauth --port 9017
@@ -45,6 +47,7 @@ services:
     image: getmeili/meilisearch:v1.12.3
     restart: always
     user: "${UID}:${GID}"
+    privileged: true
     environment:
       - MEILI_HOST=http://localhost:9700
       - MEILI_HTTP_ADDR=0.0.0.0:9700
@@ -63,6 +66,7 @@ services:
       POSTGRES_PASSWORD: mypassword
       PGPORT: 9432
     restart: always
+    privileged: true
     volumes:
       - pgdata2:/var/lib/postgresql/data
 
@@ -75,6 +79,7 @@ services:
       - DB_PORT=9432
       - RAG_PORT=9001
     restart: always
+    privileged: true
     env_file:
       - .env
 
