@@ -1,50 +1,53 @@
-# 极度兼容的 Docker 17 版本
+# 极度兼容的 Docker 17 版本 - 使用 host 网络
 
 services:
   api:
+    command: node api/server/index.js
     container_name: LibreChat
-    ports:
-      - "${PORT}:${PORT}"
-    depends_on:
-      - mongodb
-      - rag_api
+    network_mode: host
     image: ghcr.io/danny-avila/librechat-dev:latest
     restart: always
     user: "${UID}:${GID}"
     environment:
+      - NODE_ENV=development
       - HOST=0.0.0.0
-      - MONGO_URI=mongodb://mongodb:27017/LibreChat
-      - MEILI_HOST=http://meilisearch:7700
-      - RAG_PORT=${RAG_PORT:-8000}
-      - RAG_API_URL=http://rag_api:${RAG_PORT:-8000}
+      - PORT=9080
+      - MONGO_URI=mongodb://localhost:9017/LibreChat
+      - MEILI_HOST=http://localhost:9700
+      - RAG_PORT=9001
+      - RAG_API_URL=http://localhost:9001
     volumes:
+      - type: bind
+        source: ./librechat.yaml
+        target: /app/librechat.yaml 
       - type: bind
         source: ./.env
         target: /app/.env
-      - ./images:/app/client/public/images
+      - type: bind
+        source: ./images
+        target: /app/client/public/images
       - ./uploads:/app/uploads
       - ./logs:/app/api/logs
-    links:
-      - mongodb:mongodb
-      - rag_api:rag_api
-      - meilisearch:meilisearch
 
   mongodb:
     container_name: chat-mongodb
+    network_mode: host
     image: mongo
     restart: always
     user: "${UID}:${GID}"
     volumes:
       - ./data-node:/data/db
-    command: mongod --noauth
+    command: mongod --noauth --port 9017
 
   meilisearch:
     container_name: chat-meilisearch
+    network_mode: host
     image: getmeili/meilisearch:v1.12.3
     restart: always
     user: "${UID}:${GID}"
     environment:
-      - MEILI_HOST=http://meilisearch:7700
+      - MEILI_HOST=http://localhost:9700
+      - MEILI_HTTP_ADDR=0.0.0.0:9700
       - MEILI_NO_ANALYTICS=true
       - MEILI_MASTER_KEY=${MEILI_MASTER_KEY}
     volumes:
@@ -52,28 +55,28 @@ services:
 
   vectordb:
     container_name: vectordb
+    network_mode: host
     image: ankane/pgvector:latest
     environment:
       POSTGRES_DB: mydatabase
       POSTGRES_USER: myuser
       POSTGRES_PASSWORD: mypassword
+      PGPORT: 9432
     restart: always
     volumes:
       - pgdata2:/var/lib/postgresql/data
 
   rag_api:
     container_name: rag_api
+    network_mode: host
     image: ghcr.io/danny-avila/librechat-rag-api-dev-lite:latest
     environment:
-      - DB_HOST=vectordb
-      - RAG_PORT=${RAG_PORT:-8000}
+      - DB_HOST=localhost
+      - DB_PORT=9432
+      - RAG_PORT=9001
     restart: always
-    depends_on:
-      - vectordb
     env_file:
       - .env
-    links:
-      - vectordb:vectordb
 
 volumes:
   pgdata2:
