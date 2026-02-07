@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { JsonSchemaType, ConvertJsonSchemaToZodOptions } from '~/types';
+import type { JsonSchemaType, ConvertJsonSchemaToZodOptions } from '@librechat/data-schemas';
 
 function isEmptyObjectSchema(jsonSchema?: JsonSchemaType): boolean {
   return (
@@ -248,6 +248,15 @@ export function resolveJsonSchemaRefs<T extends Record<string, unknown>>(
   return result as T;
 }
 
+/**
+ * Converts a JSON Schema to a Zod schema.
+ *
+ * @deprecated This function is deprecated in favor of using JSON schemas directly.
+ * LangChain.js now supports JSON schemas natively, eliminating the need for Zod conversion.
+ * Use `resolveJsonSchemaRefs` to handle $ref references and pass the JSON schema directly to tools.
+ *
+ * @see https://js.langchain.com/docs/how_to/custom_tools/
+ */
 export function convertJsonSchemaToZod(
   schema: JsonSchemaType & Record<string, unknown>,
   options: ConvertJsonSchemaToZodOptions = {},
@@ -350,7 +359,7 @@ export function convertJsonSchemaToZod(
     } else {
       zodSchema = z.string();
     }
-  } else if (schema.type === 'number') {
+  } else if (schema.type === 'number' || schema.type === 'integer' || schema.type === 'float') {
     zodSchema = z.number();
   } else if (schema.type === 'boolean') {
     zodSchema = z.boolean();
@@ -474,8 +483,13 @@ export function convertJsonSchemaToZod(
 }
 
 /**
- * Helper function for tests that automatically resolves refs before converting to Zod
- * This ensures all tests use resolveJsonSchemaRefs even when not explicitly testing it
+ * Helper function that resolves refs before converting to Zod.
+ *
+ * @deprecated This function is deprecated in favor of using JSON schemas directly.
+ * LangChain.js now supports JSON schemas natively, eliminating the need for Zod conversion.
+ * Use `resolveJsonSchemaRefs` to handle $ref references and pass the JSON schema directly to tools.
+ *
+ * @see https://js.langchain.com/docs/how_to/custom_tools/
  */
 export function convertWithResolvedRefs(
   schema: JsonSchemaType & Record<string, unknown>,

@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import DOMPurify from 'dompurify';
 import { useForm, Controller } from 'react-hook-form';
 import { Input, Label, Button } from '@librechat/client';
 import { useMCPAuthValuesQuery } from '~/data-provider/Tools/queries';
@@ -16,35 +17,66 @@ interface CustomUserVarsSectionProps {
   onRevoke: () => void;
   isSubmitting?: boolean;
 }
-
 interface AuthFieldProps {
   name: string;
   config: CustomUserVarConfig;
   hasValue: boolean;
   control: any;
   errors: any;
+  autoFocus?: boolean;
 }
 
-function AuthField({ name, config, hasValue, control, errors }: AuthFieldProps) {
+function AuthField({ name, config, hasValue, control, errors, autoFocus }: AuthFieldProps) {
   const localize = useLocalize();
+  const statusText = hasValue ? localize('com_ui_set') : localize('com_ui_unset');
+
+  const sanitizer = useMemo(() => {
+    const instance = DOMPurify();
+    instance.addHook('afterSanitizeAttributes', (node) => {
+      if (node.tagName && node.tagName === 'A') {
+        node.setAttribute('target', '_blank');
+        node.setAttribute('rel', 'noopener noreferrer');
+      }
+    });
+    return instance;
+  }, []);
+
+  const sanitizedDescription = useMemo(() => {
+    if (!config.description) {
+      return '';
+    }
+    try {
+      return sanitizer.sanitize(config.description, {
+        ALLOWED_TAGS: ['a', 'strong', 'b', 'em', 'i', 'br', 'code'],
+        ALLOWED_ATTR: ['href', 'class', 'target', 'rel'],
+        ALLOW_DATA_ATTR: false,
+        ALLOW_ARIA_ATTR: false,
+      });
+    } catch (error) {
+      console.error('Sanitization failed', error);
+      return config.description;
+    }
+  }, [config.description, sanitizer]);
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <Label htmlFor={name} className="text-sm font-medium">
-          {config.title}
+          {config.title} <span className="sr-only">({statusText})</span>
         </Label>
-        {hasValue ? (
-          <div className="flex min-w-fit items-center gap-2 whitespace-nowrap rounded-full border border-border-medium px-2 py-0.5 text-xs font-medium text-text-secondary">
-            <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
-            <span>{localize('com_ui_set')}</span>
-          </div>
-        ) : (
-          <div className="flex min-w-fit items-center gap-2 whitespace-nowrap rounded-full border border-border-medium px-2 py-0.5 text-xs font-medium text-text-secondary">
-            <div className="h-1.5 w-1.5 rounded-full border border-border-medium" />
-            <span>{localize('com_ui_unset')}</span>
-          </div>
-        )}
+        <div aria-hidden="true">
+          {hasValue ? (
+            <div className="flex min-w-fit items-center gap-2 whitespace-nowrap rounded-full border border-border-light px-2 py-0.5 text-xs font-medium text-text-secondary">
+              <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
+              <span>{localize('com_ui_set')}</span>
+            </div>
+          ) : (
+            <div className="flex min-w-fit items-center gap-2 whitespace-nowrap rounded-full border border-border-light px-2 py-0.5 text-xs font-medium text-text-secondary">
+              <div className="h-1.5 w-1.5 rounded-full border border-border-medium" />
+              <span>{localize('com_ui_unset')}</span>
+            </div>
+          )}
+        </div>
       </div>
       <Controller
         name={name}
@@ -54,20 +86,25 @@ function AuthField({ name, config, hasValue, control, errors }: AuthFieldProps) 
           <Input
             id={name}
             type="text"
+            /* autoFocus is generally disabled due to the fact that it can disorient users,
+             * but in this case, the required field would logically be immediately navigated to anyways, and the component's
+             * functionality emulates that of a new modal opening, where users would expect focus to be shifted to the new content */
+            // eslint-disable-next-line jsx-a11y/no-autofocus
+            autoFocus={autoFocus}
             {...field}
             placeholder={
               hasValue
                 ? localize('com_ui_mcp_update_var', { 0: config.title })
                 : localize('com_ui_mcp_enter_var', { 0: config.title })
             }
-            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+            className="w-full rounded border border-border-medium bg-transparent px-2 py-1 text-text-primary placeholder:text-text-secondary focus:outline-none sm:text-sm"
           />
         )}
       />
-      {config.description && (
+      {sanitizedDescription && (
         <p
-          className="text-xs text-text-secondary [&_a]:text-blue-500 [&_a]:hover:text-blue-600 dark:[&_a]:text-blue-400 dark:[&_a]:hover:text-blue-300"
-          dangerouslySetInnerHTML={{ __html: config.description }}
+          className="text-xs text-text-secondary [&_a]:text-blue-500 [&_a]:hover:underline"
+          dangerouslySetInnerHTML={{ __html: sanitizedDescription }}
         />
       )}
       {errors[name] && <p className="text-xs text-red-500">{errors[name]?.message}</p>}
@@ -76,23 +113,22 @@ function AuthField({ name, config, hasValue, control, errors }: AuthFieldProps) 
 }
 
 export default function CustomUserVarsSection({
-  serverName,
   fields,
   onSave,
   onRevoke,
+  serverName,
   isSubmitting = false,
 }: CustomUserVarsSectionProps) {
   const localize = useLocalize();
 
-  // Fetch auth value flags for the server
   const { data: authValuesData } = useMCPAuthValuesQuery(serverName, {
     enabled: !!serverName,
   });
 
   const {
+    reset,
     control,
     handleSubmit,
-    reset,
     formState: { errors },
   } = useForm<Record<string, string>>({
     defaultValues: useMemo(() => {
@@ -114,17 +150,13 @@ export default function CustomUserVarsSection({
   };
 
   if (!fields || Object.keys(fields).length === 0) {
-    return (
-      <div className="p-4 text-center text-sm text-gray-500">
-        {localize('com_sidepanel_mcp_no_custom_vars', { '0': serverName })}
-      </div>
-    );
+    return null;
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex-1 space-y-4">
       <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
-        {Object.entries(fields).map(([key, config]) => {
+        {Object.entries(fields).map(([key, config], index) => {
           const hasValue = authValuesData?.authValueFlags?.[key] || false;
 
           return (
@@ -135,25 +167,27 @@ export default function CustomUserVarsSection({
               hasValue={hasValue}
               control={control}
               errors={errors}
+              // eslint-disable-next-line jsx-a11y/no-autofocus -- See AuthField autoFocus comment for more details
+              autoFocus={index === 0}
             />
           );
         })}
       </form>
 
-      <div className="flex justify-end gap-2 pt-2">
+      <div className="flex justify-end gap-2">
         <Button
-          onClick={handleRevokeClick}
-          className="bg-red-600 text-white hover:bg-red-700 dark:hover:bg-red-800"
+          type="button"
+          variant="destructive"
           disabled={isSubmitting}
-          size="sm"
+          onClick={handleRevokeClick}
         >
           {localize('com_ui_revoke')}
         </Button>
         <Button
-          onClick={handleSubmit(onFormSubmit)}
-          className="bg-green-500 text-white hover:bg-green-600"
+          type="button"
+          variant="submit"
           disabled={isSubmitting}
-          size="sm"
+          onClick={handleSubmit(onFormSubmit)}
         >
           {isSubmitting ? localize('com_ui_saving') : localize('com_ui_save')}
         </Button>

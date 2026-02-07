@@ -2,6 +2,7 @@ import React from 'react';
 import * as Select from '@ariakit/react/select';
 import type { Option } from '~/common';
 import { cn } from '~/utils/';
+import './Dropdown.css';
 
 interface DropdownProps {
   value?: string;
@@ -15,6 +16,7 @@ interface DropdownProps {
   iconOnly?: boolean;
   renderValue?: (option: Option) => React.ReactNode;
   ariaLabel?: string;
+  'aria-labelledby'?: string;
   portal?: boolean;
 }
 
@@ -36,6 +38,7 @@ const Dropdown: React.FC<DropdownProps> = ({
   iconOnly = false,
   renderValue,
   ariaLabel,
+  'aria-labelledby': ariaLabelledBy,
   portal = true,
 }) => {
   const handleChange = (value: string) => {
@@ -76,6 +79,7 @@ const Dropdown: React.FC<DropdownProps> = ({
         )}
         data-testid={testId}
         aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledBy}
       >
         <div className="flex w-full items-center gap-2">
           {icon}
@@ -97,7 +101,13 @@ const Dropdown: React.FC<DropdownProps> = ({
       <Select.SelectPopover
         portal={portal}
         store={selectProps}
-        className={cn('popover-ui', sizeClasses, className, 'max-h-[80vh] overflow-y-auto')}
+        className={cn(
+          'popover-ui z-40',
+          sizeClasses,
+          className,
+          'max-h-[80vh] overflow-y-auto',
+          '[pointer-events:auto]', // Override body's pointer-events:none when in modal
+        )}
       >
         {options.map((item, index) => {
           if (isDivider(item)) {
